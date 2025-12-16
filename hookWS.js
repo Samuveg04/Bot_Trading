@@ -35,7 +35,6 @@ POBOT.ws = {
   },
 
   onMessage(ws, data) {
-    // Debug inicial (solo una vez por socket)
     if (!ws.__logged) {
       console.log("[POBOT RAW TYPE]", typeof data, data);
       ws.__logged = true;
@@ -52,19 +51,16 @@ POBOT.ws = {
     try {
       let text = "";
 
-      // ArrayBuffer
       if (payload instanceof ArrayBuffer) {
         text = new TextDecoder().decode(new Uint8Array(payload));
       }
 
-      // String
       if (typeof payload === "string") {
         text = payload;
       }
 
       if (!text) return null;
 
-      // Limpiar prefijos Socket.IO
       const start = text.indexOf("[[");
       const end = text.lastIndexOf("]]");
       if (start === -1 || end === -1) return null;
