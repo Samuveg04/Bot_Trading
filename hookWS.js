@@ -23,7 +23,12 @@ POBOT.ws = {
     ws.__po_url = url;
     ws.__logged = false;
 
+    // Añadido: loguear nueva conexión
+    console.log("[POBOT] Nuevo WS creado:", url);
+
     ws.addEventListener("message", (e) => {
+      // Añadido: loguear recepción de mensaje
+      console.log("[POBOT] WS mensaje recibido de:", url);
       POBOT.ws.onMessage(ws, e.data);
     });
 
@@ -35,45 +40,33 @@ POBOT.ws = {
   },
 
   onMessage(ws, data) {
-    if (!ws.__logged) {
-      console.log("[POBOT RAW TYPE]", typeof data, data);
-      ws.__logged = true;
-    }
+    // Añadido: loguear cada mensaje recibido
+    console.log("[POBOT onMessage] Data recibida:", data);
 
-    const tick = POBOT.ws.decodePayload(data);
-    if (tick) {
-      console.log("[POBOT TICK]", tick);
-      POBOT.ws.priceSocket = ws;
-    }
-  },
-
-  decodePayload(payload) {
     try {
-      let text = "";
+      let text = data instanceof ArrayBuffer
+        ? new TextDecoder().decode(new Uint8Array(data))
+        : data;
 
-      if (payload instanceof ArrayBuffer) {
-        text = new TextDecoder().decode(new Uint8Array(payload));
-      }
-
-      if (typeof payload === "string") {
-        text = payload;
-      }
-
-      if (!text) return null;
+      // Añadido: mostrar texto decodificado
+      console.log("[POBOT] Payload texto:", text);
 
       const start = text.indexOf("[[");
       const end = text.lastIndexOf("]]");
-      if (start === -1 || end === -1) return null;
+      if (start === -1 || end === -1) return;
 
       const json = text.substring(start, end + 2);
       const parsed = JSON.parse(json);
 
-      if (!Array.isArray(parsed)) return null;
+      if (!Array.isArray(parsed)) return;
 
       const [asset, time, price] = parsed[0];
-      return { asset, time, price };
+      console.log("[POBOT TICK]", { asset, time, price });
+
+      POBOT.ws.priceSocket = ws;
+
     } catch (e) {
-      return null;
+      console.error("[POBOT] Error decodificando payload:", e);
     }
   }
 };
