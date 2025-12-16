@@ -71,23 +71,38 @@ attach(ws, url) {
   },
 
   decodeBinary(buffer) {
-    try {
-      const bytes = new Uint8Array(buffer);
-      const text = new TextDecoder().decode(bytes);
+  try {
+    // ArrayBuffer → Uint8
+    const bytes = new Uint8Array(buffer);
 
-      // Ejemplo esperado: [["AUDJPY",1765888620.276,102.778]]
-      const parsed = JSON.parse(text);
-      if (!Array.isArray(parsed)) return null;
-
-      const [asset, time, price] = parsed[0];
-      return {
-        asset,
-        time,
-        price
-      };
-    } catch (e) {
-      return null;
+    // Uint8 → HEX
+    let hex = "";
+    for (let b of bytes) {
+      hex += b.toString(16).padStart(2, "0");
     }
+
+    // HEX → STRING
+    let str = "";
+    for (let i = 0; i < hex.length; i += 2) {
+      str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+    }
+
+    // Buscar JSON válido
+    const start = str.indexOf("[[");
+    const end = str.lastIndexOf("]]");
+
+    if (start === -1 || end === -1) return null;
+
+    const json = str.substring(start, end + 2);
+    const parsed = JSON.parse(json);
+
+    const [asset, time, price] = parsed[0];
+
+    return { asset, time, price };
+  } catch (e) {
+    return null;
   }
+}
 };
+
 
