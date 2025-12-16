@@ -7,32 +7,60 @@ POBOT.ws = {
   init() {
     const OriginalWS = window.WebSocket;
 
-    // Sobrescribir WebSocket para capturar nuevas conexiones
-    window.WebSocket = function (url, protocols) {
+    // Hook al constructor WebSocket para captar nuevas conexiones
+    window.WebSocket = function(url, protocols) {
       const ws = protocols ? new OriginalWS(url, protocols) : new OriginalWS(url);
       POBOT.ws.attach(ws, url);
       return ws;
     };
 
-    // Enganchar websockets ya existentes
+    // Copiar propiedades del constructor original
+    window.WebSocket.prototype = OriginalWS.prototype;
+    window.WebSocket.CONNECTING = OriginalWS.CONNECTING;
+    window.WebSocket.OPEN = OriginalWS.OPEN;
+    window.WebSocket.CLOSING = OriginalWS.CLOSING;
+    window.WebSocket.CLOSED = OriginalWS.CLOSED;
+
+    // Enganchar websockets existentes (buscando en todas las propiedades globales)
+    for (const key in window) {
+      try {
+        const val = window[key];
+        if (val instanceof WebSocket && !val.__po_hooked) {
+          POBOT.ws.attach(val, val.url || "existing");
+          val.__po_hooked = true;
+          console.log("[POBOT] Socket existente enganchado (global):", val.url || "unknown");
+        }
+      } catch (e) {
+        // Evitar errores por propiedades inaccesibles
+      }
+    }
+
+    // Intenta enganchar websockets en window.__wsPool (si existe)
     if (window.__wsPool && Array.isArray(window.__wsPool)) {
       window.__wsPool.forEach(ws => {
         if (!ws.__po_hooked) {
           POBOT.ws.attach(ws, ws.url || "existing");
           ws.__po_hooked = true;
-          console.log("[POBOT] Socket existente enganchado:", ws.url || "unknown");
+          console.log("[POBOT] Socket existente enganchado (__wsPool):", ws.url || "unknown");
         }
       });
-    } else {
-      console.warn("[POBOT] No se encontró pool de websockets activos");
     }
 
     console.log("[POBOT] WebSocket hook activo");
   },
 
   attach(ws, url) {
+    if (ws.__po_hooked) return; // Evitar enganchar dos veces
     ws.__po_url = url;
+    ws.__po_hooked = true;
     ws.__logged = false;
+
+    // Hookear send para debug (opcional)
+    const originalSend = ws.send;
+    ws.send = function(data) {
+      //console.log("[POBOT SEND]", data);
+      originalSend.apply(ws, arguments);
+    };
 
     ws.addEventListener("message", (e) => {
       POBOT.ws.onMessage(ws, e.data);
@@ -40,6 +68,14 @@ POBOT.ws = {
 
     ws.addEventListener("open", () => {
       console.log("[POBOT] WS abierto:", url);
+    });
+
+    ws.addEventListener("close", () => {
+      console.log("[POBOT] WS cerrado:", url);
+    });
+
+    ws.addEventListener("error", (err) => {
+      console.error("[POBOT] WS error:", url, err);
     });
 
     POBOT.ws.sockets.push(ws);
