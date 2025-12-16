@@ -1,45 +1,46 @@
-(function () {
-  // Evitar doble carga
+// loader.js
+(function() {
   if (window.POBOT && window.POBOT.loaded) {
-    console.log("[POBOT] Ya estaba cargado");
+    console.log("[POBOT] Ya cargado");
     return;
   }
 
-  // Namespace global
   window.POBOT = window.POBOT || {};
   window.POBOT.loaded = false;
 
-  // Archivos principales del bot
   const files = [
-    "hookWS.js"
+    "hookWS.js",
+    "botLogic.js"
   ];
 
   let loadedCount = 0;
 
   function loadScript(file) {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/gh/Samuveg04/Bot_Trading@main/" + file + "?v=1";
-    script.onload = function () {
-      loadedCount++;
-      console.log("[POBOT] Archivo cargado:", file);
-
-      if (loadedCount === files.length) {
-        window.POBOT.loaded = true;
-        console.log("[POBOT] Bot cargado completamente");
-
-        // Inicializar WebSocket hook
-        if (window.POBOT.ws && typeof window.POBOT.ws.init === "function") {
-          window.POBOT.ws.init();
-        }
-      }
-    };
-
-    script.onerror = function () {
-      console.error("[POBOT] Error cargando:", file);
-    };
-
-    document.documentElement.appendChild(script);
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = `https://cdn.jsdelivr.net/gh/Samuveg04/Bot_Trading@main/${file}`;
+      script.onload = () => {
+        console.log(`[POBOT] Cargado: ${file}`);
+        loadedCount++;
+        resolve();
+      };
+      script.onerror = () => reject(`[POBOT] Error cargando: ${file}`);
+      document.head.appendChild(script);
+    });
   }
 
-  files.forEach(loadScript);
+  async function loadAll() {
+    try {
+      for (const f of files) {
+        await loadScript(f);
+      }
+      window.POBOT.loaded = true;
+      if (window.POBOT.ws && window.POBOT.ws.init) window.POBOT.ws.init();
+      console.log("[POBOT] Bot cargado y listo");
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  loadAll();
 })();
