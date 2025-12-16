@@ -6,28 +6,42 @@ POBOT.ws = {
   lastAsset: null,
 
   init() {
-    const OriginalWS = window.WebSocket;
+  const OriginalWS = window.WebSocket;
 
-    window.WebSocket = function (url, protocols) {
-      const ws = protocols
-        ? new OriginalWS(url, protocols)
-        : new OriginalWS(url);
+  // Hook global
+  window.WebSocket = function (url, protocols) {
+    const ws = protocols
+      ? new OriginalWS(url, protocols)
+      : new OriginalWS(url);
 
-      ws.__po_url = url;
-      ws.__isPrice = false;
+    POBOT.ws.attach(ws, url);
+    return ws;
+  };
 
-      ws.addEventListener("message", (e) => {
-        POBOT.ws.onMessage(ws, e.data);
-      });
+  // Hook sockets ya existentes (fallback)
+  if (window.__wsPool) {
+    window.__wsPool.forEach(ws => {
+      POBOT.ws.attach(ws, ws.url || "existing");
+    });
+  }
 
-      ws.addEventListener("open", () => {
-        console.log("[POBOT] WS abierto:", url);
-      });
+  console.log("[POBOT] WebSocket hook activo");
+},
 
-      POBOT.ws.sockets.push(ws);
-      return ws;
-    };
-  },
+attach(ws, url) {
+  ws.__po_url = url;
+  ws.__isPrice = false;
+
+  ws.addEventListener("message", (e) => {
+    POBOT.ws.onMessage(ws, e.data);
+  });
+
+  ws.addEventListener("open", () => {
+    console.log("[POBOT] WS abierto:", url);
+  });
+
+  POBOT.ws.sockets.push(ws);
+}
 
   onMessage(ws, data) {
     // BINARIO = precios
@@ -76,3 +90,4 @@ POBOT.ws = {
     }
   }
 };
+
